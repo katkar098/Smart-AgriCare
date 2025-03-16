@@ -1,6 +1,7 @@
 # Importing essential libraries and modules
 
-from flask import Flask, render_template, request, Markup
+# from flask import Flask, render_template, request, Markup
+from markupsafe import Markup
 import numpy as np
 import pandas as pd
 from utils.disease import disease_dic
@@ -13,6 +14,9 @@ import torch
 from torchvision import transforms
 from PIL import Image
 from utils.model import ResNet9
+from flask import Flask, render_template, request
+from markupsafe import Markup
+
 # ==============================================================================================
 
 # -------------------------LOADING THE TRAINED MODELS -----------------------------------------------
@@ -64,12 +68,14 @@ disease_model.load_state_dict(torch.load(
     disease_model_path, map_location=torch.device('cpu')))
 disease_model.eval()
 
+crop_scaler = pickle.load(open('./models/crop_scaler.pkl','rb'))
+model = pickle.load(open('./models/crop_recommendation_model (1).pkl', 'rb'))
 
 # Loading crop recommendation model
 
-crop_recommendation_model_path = 'models/RandomForest.pkl'
-crop_recommendation_model = pickle.load(
-    open(crop_recommendation_model_path, 'rb'))
+# crop_recommendation_model_path = 'models/RandomForest.pkl'
+# crop_recommendation_model = pickle.load(
+#     open(crop_recommendation_model_path, 'rb'))
 
 
 # =========================================================================================
@@ -175,21 +181,28 @@ def crop_prediction():
         K = int(request.form['pottasium'])
         ph = float(request.form['ph'])
         rainfall = float(request.form['rainfall'])
-
+        temperature=float(request.form['temperature'])
+        humidity=float(request.form['humidity'])
         # state = request.form.get("stt")
-        city = request.form.get("city")
+        # city = request.form.get("city")
 
-        if weather_fetch(city) != None:
-            temperature, humidity = weather_fetch(city)
-            data = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
-            my_prediction = crop_recommendation_model.predict(data)
-            final_prediction = my_prediction[0]
+        # if weather_fetch(city) != None:
+            # temperature, humidity = weather_fetch(city)
+        # data = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
+        # print(f"N: {N}, P: {P}, K: {K}, pH: {ph}, Rainfall: {rainfall}")
 
-            return render_template('crop-result.html', prediction=final_prediction, title=title)
+            # Placeholder Temperature and Humidity
+        # temperature = 22.61
+        # humidity = 63.69
 
-        else:
+            # Preparing features array
+        features = [int(N), int(P), int(K), float(temperature), float(humidity), float(ph), float(rainfall)]
+        label = model.predict(crop_scaler.transform([features]))
 
-            return render_template('try_again.html', title=title)
+        return render_template('crop-result.html', prediction=label[0], title=title)
+
+    else:
+        return render_template('try_again.html', title=title)
 
 # render fertilizer recommendation result page
 
